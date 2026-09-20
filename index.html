@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Luigi's Mansion</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
+
+    #status {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      color: white;
+      font-family: monospace;
+      font-size: 14px;
+      z-index: 10;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="status">Starting...</div>
+<canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+<script>
+const TOTAL_PARTS = 24;
+const PART_PREFIX = "./index.data.part";
+
+const status = document.getElementById("status");
+
+function setStatus(message) {
+    status.textContent = message;
+    console.log(message);
+}
+
+/*
+ * Emscripten's generated loader normally downloads index.data itself.
+ *
+ * We intercept fetch("index.data"), download all of the split pieces,
+ * combine them into one Blob, and return that Blob as the response.
+ */
+const originalFetch = window.fetch.bind(window);
+
+let combinedDataPromise = null;
+
+async function loadSplitData() {
+
+    if (combinedDataPromise) {
+        return combinedDataPromise;
+    }
+
+    combinedDataPromise = (async () => {
+
+        const parts = [];
+
+        for (let i = 0; i < TOTAL_PARTS; i++) {
+
+            const number = String(i).padStart(3, "0");
+            const filename = PART_PREFIX + number;
+
+            setStatus(
+                "Downloading data part " +
+                (i + 1) +
+                " / " +
+                TOTAL_PARTS +
+                "..."
+            );
+
+            const response = await originalFetch(filename, {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    "Could not download " +
+                    filename +
+                    " (HTTP " +
+                    response.status +
+                    ")"
+                );
+            }
+
+            const data = await response.arrayBuffer();
+
+            console.log(
+                filename +
+                ": " +
+                data.byteLength +
+                " bytes"
+            );
+
+            parts.push(new Uint8Array(data));
+        }
+
+        setStatus("Combining data parts...");
+
+        let totalSize = 0;
+
+        for (const part of parts) {
+            totalSize += part.byteLength;
+        }
+
+        const combined = new Uint8Array(totalSize);
+
+        let offset = 0;
+
+        for (const part of parts) {
+            combined.set(part, offset);
+            offset += part.byteLength;
+        }
+
+        console.log(
+            "Combined index.data size:",
+            combined.byteLength
+        );
+
+        setStatus(
+            "Data downloaded: " +
+            combined.byteLength.toLocaleString() +
+            " bytes\nStarting game..."
+        );
+
+        return new Blob(
+            [combined],
+            { type: "application/octet-stream" }
+        );
+    })();
+
+    return combinedDataPromise;
+}
+
+
+/*
+ * Replace the normal index.data request.
+ */
+window.fetch = async function(input, init) {
+
+    let url = "";
+
+    if (typeof input === "string") {
+        url = input;
+    } else if (input instanceof Request) {
+        url = input.url;
+    }
+
+    const filename = url.split("/").pop().split("?")[0];
+
+    if (filename === "index.data") {
+
+        console.log("Intercepted Emscripten index.data request");
+
+        const blob = await loadSplitData();
+
+        return new Response(blob, {
+            status: 200,
+            headers: {
+                "Content-Type": "application/octet-stream",
+                "Content-Length": String(blob.size)
+            }
+        });
+    }
+
+    return originalFetch(input, init);
+};
+
+
+/*
+ * Emscripten configuration.
+ */
+var Module = {
+
+    canvas: document.getElementById("canvas"),
+
+    locateFile: function(path) {
+
+        if (path === "index.data") {
+            return "./index.data";
+        }
+
+        return "./" + path;
+    },
+
+    print: function(text) {
+        console.log(text);
+    },
+
+    printErr: function(text) {
+        console.error(text);
+        status.textContent = text;
+    },
+
+    setStatus: function(text) {
+        setStatus(text);
+    },
+
+    monitorRunDependencies: function(left) {
+
+        console.log(
+            "Emscripten dependencies remaining:",
+            left
+        );
+
+        if (left === 0) {
+            status.textContent = "";
+        }
+    }
+};
+
+window.Module = Module;
+</script>
+
+<script src="./index.js"></script>
+
+</body>
+</html>
