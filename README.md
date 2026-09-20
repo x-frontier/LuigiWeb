@@ -16,3 +16,10 @@ A web  port of Luigi's Mansion for the Nintendo Gamecube
 
 
 I do not know a way to fix this bug. So this web port is currently UNPLAYABLE until I find a fix.
+
+# AI Usage
+
+Because I am new to making web ports, AI has been used during the process of making this.
+
+I used Google Gemini to help me make the actual thing itself such as the commands for ModernGekko or DolRecomp.
+I used ChatGPT to help with the main console to check out the bugs.
