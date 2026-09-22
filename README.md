@@ -23,3 +23,6 @@ Because I am new to making web ports, AI has been used during the process of mak
 
 I used Google Gemini to help me make the actual thing itself such as the commands for ModernGekko or DolRecomp.
 I used ChatGPT to help with the main console to check out the bugs.
+
+
+If anyone knows how to fix these bugs, PLEASE dm me on discord (0kingofthepirate0) or fork this repo idk
